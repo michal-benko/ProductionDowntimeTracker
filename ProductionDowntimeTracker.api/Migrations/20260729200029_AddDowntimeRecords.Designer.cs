@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ProductionDowntimeTracker.api.Data;
 
@@ -11,9 +12,11 @@ using ProductionDowntimeTracker.api.Data;
 namespace ProductionDowntimeTracker.api.Migrations
 {
     [DbContext(typeof(MachineDbContext))]
-    partial class MachineDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260729200029_AddDowntimeRecords")]
+    partial class AddDowntimeRecords
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -13,5 +13,16 @@ namespace ProductionDowntimeTracker.api.Data
 
         public DbSet<Machine> Machines { get; set; }
 
+        public DbSet<DowntimeRecord> DowntimeRecords { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<DowntimeRecord>()
+                .HasOne(d => d.Machine)
+                .WithMany()
+                .HasForeignKey(d => d.MachineId)
+                .OnDelete(DeleteBehavior.Restrict);
+        }
+
     }
 }
