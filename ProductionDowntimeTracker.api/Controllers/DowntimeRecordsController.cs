@@ -57,5 +57,32 @@ namespace ProductionDowntimeTracker.api.Controllers
 
             return StatusCode(StatusCodes.Status201Created, downtimeRecord);
         }
+
+        [HttpPut("{id}/stop")]
+        public async Task<IActionResult> StopDowntime(int id)
+        {
+            // Vyhledání prostoje podle jeho ID
+            var downtimeRecord =
+                await _context.DowntimeRecords.FindAsync(id);
+
+            if (downtimeRecord == null)
+            {
+                return NotFound(
+                    $"Prostoj s ID {id} neexistuje.");
+            }
+
+            // Již ukončený prostoj nelze ukončit znovu
+            if (downtimeRecord.EndTime != null)
+            {
+                return Conflict(
+                    $"Prostoj s ID {id} už byl ukončen.");
+            }
+
+            downtimeRecord.EndTime = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(downtimeRecord);
+        }
     }
 }
