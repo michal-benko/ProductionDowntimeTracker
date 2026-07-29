@@ -84,5 +84,15 @@ namespace ProductionDowntimeTracker.api.Controllers
 
             return Ok(downtimeRecord);
         }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<DowntimeRecord>>> GetDowntimeRecords()
+        {
+            var downtimeRecords = await _context.DowntimeRecords
+                .OrderByDescending(record => record.StartTime)
+                .ToListAsync();
+
+            return Ok(downtimeRecords);
+        }
     }
 }
