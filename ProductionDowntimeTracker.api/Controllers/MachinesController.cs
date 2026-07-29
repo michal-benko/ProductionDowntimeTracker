@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using ProductionDowntimeTracker.api.Models;
-using ProductionDowntimeTracker.api.Services;
 using ProductionDowntimeTracker.api.Data;
 using Microsoft.EntityFrameworkCore;
 

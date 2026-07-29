@@ -1,4 +1,3 @@
-using ProductionDowntimeTracker.api.Services;
 using ProductionDowntimeTracker.api.Data;
 using Microsoft.EntityFrameworkCore;
 
