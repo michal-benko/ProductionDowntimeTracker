@@ -1,0 +1,62 @@
+﻿@page "/machines"
+@using System.Net.Http.Json
+@using ProductionDowntimeTracker.Client.Models
+@inject HttpClient Http
+
+<PageTitle>Stroje</PageTitle>
+
+<h1>Stroje</h1>
+
+@if (errorMessage is not null)
+{
+    <p class="text-danger">@errorMessage</p>
+}
+else if (machines is null)
+{
+    <p>Načítám stroje...</p>
+}
+else if (machines.Count == 0)
+{
+    <p>V databázi nejsou žádné stroje.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Název</th>
+                <th>Stav</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (MachineDto machine in machines)
+            {
+                <tr>
+                    <td>@machine.Id</td>
+                    <td>@machine.Name</td>
+                    <td>@(machine.IsRunning ? "V provozu" : "Mimo provoz")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<MachineDto>? machines;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            machines =
+                await Http.GetFromJsonAsync<List<MachineDto>>("api/Machines")
+                ?? new List<MachineDto>();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Stroje se nepodařilo načíst: {ex.Message}";
+        }
+    }
+}
