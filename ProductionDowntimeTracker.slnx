@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="ProductionDowntimeTracker.api/ProductionDowntimeTracker.api.csproj" />
+  <Project Path="ProductionDowntimeTracker.Client/ProductionDowntimeTracker.Client.csproj" Id="816b99d0-39cc-4044-98e6-c1f4f3dcf611" />
 </Solution>
