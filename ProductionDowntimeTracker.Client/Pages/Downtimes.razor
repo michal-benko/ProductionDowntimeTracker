@@ -1,0 +1,217 @@
+﻿@page "/downtimes"
+@using ProductionDowntimeTracker.Client.Models
+@inject HttpClient Http
+
+<PageTitle>Prostoje</PageTitle>
+
+<h1>Evidence prostojů</h1>
+
+<h3>Zahájit nový prostoj</h3>
+
+<EditForm Model="@newDowntime" OnValidSubmit="@StartDowntimeAsync">
+    <DataAnnotationsValidator />
+
+    <div class="mb-3">
+        <label for="machineId" class="form-label">Stroj</label>
+
+        <InputSelect id="machineId"
+                     class="form-select"
+                     @bind-Value="newDowntime.MachineId">
+            <option value="0">-- Vyberte stroj --</option>
+
+            @if (machines is not null)
+            {
+                @foreach (MachineDto machine in machines)
+                {
+                    <option value="@machine.Id">@machine.Name</option>
+                }
+            }
+        </InputSelect>
+
+        <ValidationMessage For="@(() => newDowntime.MachineId)"
+                           class="text-danger" />
+    </div>
+
+    <div class="mb-3">
+        <label for="reason" class="form-label">Důvod prostoje</label>
+
+        <InputText id="reason"
+                   class="form-control"
+                   @bind-Value="newDowntime.Reason" />
+
+        <ValidationMessage For="@(() => newDowntime.Reason)"
+                           class="text-danger" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+        Zahájit prostoj
+    </button>
+</EditForm>
+
+<hr />
+
+@if (errorMessage is not null)
+{
+    <div class="alert alert-danger">
+        @errorMessage
+    </div>
+}
+else if (downtimeRecords is null)
+{
+    <p>Načítání prostojů...</p>
+}
+else if (downtimeRecords.Count == 0)
+{
+    <p>Zatím nejsou evidovány žádné prostoje.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Stroj</th>
+                <th>Důvod</th>
+                <th>Začátek</th>
+                <th>Konec</th>
+                <th>Délka</th>
+                <th>Stav</th>
+                <th>Akce</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (DowntimeRecordDto record in downtimeRecords)
+            {
+                <tr>
+                    <td>@record.Id</td>
+                    <td>@GetMachineName(record.MachineId)</td>
+                    <td>@record.Reason</td>
+                    <td>@record.StartTime.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
+                    <td>
+                        @(record.EndTime.HasValue
+                            ? record.EndTime.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                            : "—")
+                    </td>
+                    <td>@GetDuration(record)</td>
+                    <td>
+                        @(record.EndTime.HasValue ? "Ukončený" : "Probíhá")
+                    </td>
+                    <td>
+                        @if (!record.EndTime.HasValue)
+                        {
+                            <button type="button"
+                                    class="btn btn-success btn-sm"
+                                    @onclick="() => StopDowntimeAsync(record.Id)">
+                                Ukončit prostoj
+                            </button>
+                        }
+                        else
+                        {
+                            <span>—</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<DowntimeRecordDto>? downtimeRecords;
+    private string? errorMessage;
+    private List<MachineDto>? machines;
+    private StartDowntimeRequestDto newDowntime = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            downtimeRecords =
+                await Http.GetFromJsonAsync<List<DowntimeRecordDto>>(
+                    "api/DowntimeRecords");
+
+            machines =
+                await Http.GetFromJsonAsync<List<MachineDto>>(
+                    "api/Machines");
+        }
+        catch (Exception ex)
+        {
+            errorMessage =
+                $"Prostoje se nepodařilo načíst: {ex.Message}";
+        }
+    }
+
+    private string GetMachineName(int machineId)
+    {
+        MachineDto? machine =
+            machines?.FirstOrDefault(machine => machine.Id == machineId);
+
+        return machine?.Name ?? $"Neznámý stroj (ID {machineId})";
+    }
+
+    private async Task StartDowntimeAsync()
+    {
+        try
+        {
+            errorMessage = null;
+
+            HttpResponseMessage response =
+                await Http.PostAsJsonAsync(
+                    "api/DowntimeRecords/start",
+                    newDowntime);
+
+            response.EnsureSuccessStatusCode();
+
+            downtimeRecords =
+                await Http.GetFromJsonAsync<List<DowntimeRecordDto>>(
+                    "api/DowntimeRecords");
+
+            newDowntime = new StartDowntimeRequestDto();
+        }
+        catch (Exception ex)
+        {
+            errorMessage =
+                $"Prostoj se nepodařilo zahájit: {ex.Message}";
+        }
+    }
+
+    private async Task StopDowntimeAsync(int id)
+    {
+        try
+        {
+            errorMessage = null;
+
+            HttpResponseMessage response =
+                await Http.PutAsync(
+                    $"api/DowntimeRecords/{id}/stop",
+                    null);
+
+            response.EnsureSuccessStatusCode();
+
+            downtimeRecords =
+                await Http.GetFromJsonAsync<List<DowntimeRecordDto>>(
+                    "api/DowntimeRecords");
+        }
+        catch (Exception ex)
+        {
+            errorMessage =
+                $"Prostoj se nepodařilo ukončit: {ex.Message}";
+        }
+    }
+
+    private string GetDuration(DowntimeRecordDto record)
+    {
+        if (!record.EndTime.HasValue)
+        {
+            return "Probíhá";
+        }
+
+        TimeSpan duration =
+            record.EndTime.Value - record.StartTime;
+
+        int totalMinutes = (int)duration.TotalMinutes;
+
+        return $"{totalMinutes} min";
+    }
+}

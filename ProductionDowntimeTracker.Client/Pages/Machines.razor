@@ -7,6 +7,39 @@
 
 <h1>Stroje</h1>
 
+<h2>Přidat nový stroj</h2>
+
+<th>Akce</th>
+
+<EditForm Model="@newMachine" OnValidSubmit="@CreateMachineAsync">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label for="machineName" class="form-label">Název stroje</label>
+
+        <InputText id="machineName"
+                   class="form-control"
+                   @bind-Value="newMachine.Name" />
+    <ValidationMessage For="@(() => newMachine.Name)"
+                       class="text-danger" />
+    </div>
+
+    <div class="form-check mb-3">
+        <InputCheckbox id="isRunning"
+                       class="form-check-input"
+                       @bind-Value="newMachine.IsRunning" />
+
+        <label for="isRunning" class="form-check-label">
+            Stroj je v provozu
+        </label>
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+        Přidat stroj
+    </button>
+</EditForm>
+
+<hr />
+
 @if (errorMessage is not null)
 {
     <p class="text-danger">@errorMessage</p>
@@ -36,6 +69,19 @@ else
                     <td>@machine.Id</td>
                     <td>@machine.Name</td>
                     <td>@(machine.IsRunning ? "V provozu" : "Mimo provoz")</td>
+                    <td>
+                        <button type="button"
+                                class="btn btn-warning btn-sm me-2"
+                                @onclick="() => ToggleMachineStatusAsync(machine)">
+                            @(machine.IsRunning ? "Zastavit" : "Spustit")
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-danger btn-sm"
+                                @onclick="() => DeleteMachineAsync(machine.Id)">
+                            Smazat
+                        </button>
+                    </td>
                 </tr>
             }
         </tbody>
@@ -45,6 +91,8 @@ else
 @code {
     private List<MachineDto>? machines;
     private string? errorMessage;
+    private CreateMachineRequestDto newMachine =
+    new CreateMachineRequestDto();
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,6 +105,85 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Stroje se nepodařilo načíst: {ex.Message}";
+        }
+    }
+
+    private async Task CreateMachineAsync()
+    {
+        try
+        {
+            errorMessage = null;
+
+            HttpResponseMessage response =
+                await Http.PostAsJsonAsync("api/Machines", newMachine);
+
+            response.EnsureSuccessStatusCode();
+
+            MachineDto? createdMachine =
+                await response.Content.ReadFromJsonAsync<MachineDto>();
+
+            if (createdMachine is not null)
+            {
+                machines ??= new List<MachineDto>();
+                machines.Add(createdMachine);
+            }
+
+            newMachine = new CreateMachineRequestDto();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Stroj se nepodařilo vytvořit: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteMachineAsync(int id)
+    {
+        try
+        {
+            errorMessage = null;
+
+            HttpResponseMessage response =
+                await Http.DeleteAsync($"api/Machines/{id}");
+
+            response.EnsureSuccessStatusCode();
+
+            machines?.RemoveAll(machine => machine.Id == id);
+        }
+        catch (Exception ex)
+        {
+            errorMessage =
+                $"Stroj se nepodařilo smazat: {ex.Message}";
+        }
+    }
+
+    private async Task ToggleMachineStatusAsync(MachineDto machine)
+    {
+        try
+        {
+            errorMessage = null;
+
+            UpdateMachineRequestDto request =
+                new UpdateMachineRequestDto
+                {
+                    Name = machine.Name,
+                    IsRunning = !machine.IsRunning
+                };
+
+            HttpResponseMessage response =
+                await Http.PutAsJsonAsync(
+                    $"api/Machines/{machine.Id}",
+                    request);
+
+            response.EnsureSuccessStatusCode();
+
+            machines =
+                await Http.GetFromJsonAsync<List<MachineDto>>(
+                    "api/Machines");
+        }
+        catch (Exception ex)
+        {
+            errorMessage =
+                $"Stav stroje se nepodařilo změnit: {ex.Message}";
         }
     }
 }

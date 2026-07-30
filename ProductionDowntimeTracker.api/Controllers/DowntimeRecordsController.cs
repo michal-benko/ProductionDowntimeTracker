@@ -1,8 +1,9 @@
-﻿using ProductionDowntimeTracker.api.Data;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using ProductionDowntimeTracker.api.Data;
 using ProductionDowntimeTracker.api.DTOs;
 using ProductionDowntimeTracker.api.Models;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using System.Reflection.PortableExecutable;
 
 
 namespace ProductionDowntimeTracker.api.Controllers
@@ -89,7 +90,7 @@ namespace ProductionDowntimeTracker.api.Controllers
         public async Task<ActionResult<IEnumerable<DowntimeRecord>>> GetDowntimeRecords()
         {
             var downtimeRecords = await _context.DowntimeRecords
-                .OrderByDescending(record => record.StartTime)
+                .OrderBy(record => record.StartTime)
                 .ToListAsync();
 
             return Ok(downtimeRecords);
