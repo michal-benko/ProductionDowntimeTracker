@@ -30,7 +30,6 @@ namespace ProductionDowntimeTracker.Tests
             var request = new StartDowntimeRequest
             {
                 MachineId = 999,
-                Reason = "Test"
             };
 
             // Act – pokus o zahájení prostoje.
@@ -67,7 +66,6 @@ namespace ProductionDowntimeTracker.Tests
                 MachineId = 1,
                 StartTime = DateTime.UtcNow.AddMinutes(-30),
                 EndTime = null,
-                Reason = "Probíhající prostoj"
             });
 
             await context.SaveChangesAsync();
@@ -77,7 +75,6 @@ namespace ProductionDowntimeTracker.Tests
             var request = new StartDowntimeRequest
             {
                 MachineId = 1,
-                Reason = "Nový prostoj"
             };
 
             // Act – pokus o zahájení druhého prostoje.
@@ -95,6 +92,191 @@ namespace ProductionDowntimeTracker.Tests
             Assert.Equal(
                 1,
                 await context.DowntimeRecords.CountAsync());
+        }
+
+        [Fact]
+        public async Task StopDowntime_ValidRequest_ReturnsOkAndUpdatesRecord()
+        {
+            // Arrange
+            await using var context = CreateContext();
+
+            var machine = new Machine
+            {
+                Id = 1,
+                Name = "M1"
+            };
+
+            var category = new DowntimeCategory
+            {
+                Id = 2,
+                Name = "Problém s PLC logikou"
+            };
+
+            var downtimeRecord = new DowntimeRecord
+            {
+                MachineId = machine.Id,
+                StartTime = DateTime.UtcNow.AddMinutes(-30),
+                EndTime = null
+            };
+
+            context.Machines.Add(machine);
+            context.DowntimeCategories.Add(category);
+            context.DowntimeRecords.Add(downtimeRecord);
+
+            await context.SaveChangesAsync();
+
+            var controller = new DowntimeRecordsController(context);
+
+            var request = new StopDowntimeRequest
+            {
+                CategoryId = category.Id,
+                Detail = "  PLC program byl opraven.  "
+            };
+
+            DateTime beforeStop = DateTime.UtcNow;
+
+            // Act
+            var result = await controller.StopDowntime(downtimeRecord.Id, request);
+
+            DateTime afterStop = DateTime.UtcNow;
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result);
+
+            var returnedRecord = Assert.IsType<DowntimeRecord>(okResult.Value);
+
+            Assert.Equal(category.Id, returnedRecord.CategoryId);
+            Assert.Equal("PLC program byl opraven.", returnedRecord.Detail);
+            Assert.NotNull(returnedRecord.EndTime);
+            Assert.InRange(returnedRecord.EndTime.Value, beforeStop, afterStop);
+
+            context.ChangeTracker.Clear();
+
+            var savedRecord = await context.DowntimeRecords.FindAsync(downtimeRecord.Id);
+
+            Assert.NotNull(savedRecord);
+            Assert.Equal(category.Id, savedRecord.CategoryId);
+            Assert.Equal("PLC program byl opraven.", savedRecord.Detail);
+            Assert.Equal(returnedRecord.EndTime, savedRecord.EndTime);
+        }
+
+        [Fact]
+        public async Task StopDowntime_CategoryDoesNotExist_ReturnsNotFound()
+        {
+            // Arrange
+            await using var context = CreateContext();
+
+            var machine = new Machine
+            {
+                Id = 1,
+                Name = "M1"
+            };
+
+            var downtimeRecord = new DowntimeRecord
+            {
+                MachineId = machine.Id,
+                StartTime = DateTime.UtcNow.AddMinutes(-30),
+                EndTime = null
+            };
+
+            context.Machines.Add(machine);
+            context.DowntimeRecords.Add(downtimeRecord);
+
+            await context.SaveChangesAsync();
+
+            var controller = new DowntimeRecordsController(context);
+
+            var request = new StopDowntimeRequest
+            {
+                CategoryId = 999,
+                Detail = "  PLC program byl opraven.  "
+            };
+
+            // Act
+            var result = await controller.StopDowntime(downtimeRecord.Id, request);
+
+            // Assert
+            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+
+            Assert.Equal("Kategorie s ID 999 neexistuje.", notFoundResult.Value);
+
+            context.ChangeTracker.Clear();
+
+            var savedRecord = await context.DowntimeRecords.FindAsync(downtimeRecord.Id);
+
+            Assert.NotNull(savedRecord);
+            Assert.Null(savedRecord.CategoryId);
+            Assert.Null(savedRecord.Detail);
+            Assert.Null(savedRecord.EndTime);
+        }
+
+        [Fact]
+        public async Task StopDowntime_DetailTooShortAfterTrim_ReturnsBadRequest()
+        {
+            // Arrange
+            await using var context = CreateContext();
+
+            var machine = new Machine
+            {
+                Id = 1,
+                Name = "M1"
+            };
+
+            var category = new DowntimeCategory
+            {
+                Id = 2,
+                Name = "Problém s PLC logikou"
+            };
+
+            var downtimeRecord = new DowntimeRecord
+            {
+                MachineId = machine.Id,
+                StartTime = DateTime.UtcNow.AddMinutes(-30),
+                EndTime = null
+            };
+
+            context.Machines.Add(machine);
+            context.DowntimeCategories.Add(category);
+            context.DowntimeRecords.Add(downtimeRecord);
+
+            await context.SaveChangesAsync();
+
+            var controller = new DowntimeRecordsController(context);
+
+            var request = new StopDowntimeRequest
+            {
+                CategoryId = category.Id,
+
+                // Před Trim() má text více než 5 znaků,
+                // po odstranění mezer zůstane pouze "PLC", tedy 3 znaky.
+                Detail = "   PLC   "
+            };
+
+            // Act
+            var result = await controller.StopDowntime(
+                downtimeRecord.Id,
+                request);
+
+            // Assert
+            var badRequestResult =
+                Assert.IsType<BadRequestObjectResult>(result);
+
+            Assert.Equal(
+                "Detail musí obsahovat alespoň 5 znaků.",
+                badRequestResult.Value);
+
+            // Znovu načteme záznam z databáze.
+            context.ChangeTracker.Clear();
+
+            var savedRecord =
+                await context.DowntimeRecords.FindAsync(downtimeRecord.Id);
+
+            Assert.NotNull(savedRecord);
+
+            // Neplatný požadavek nesmí prostoj nijak změnit.
+            Assert.Null(savedRecord.CategoryId);
+            Assert.Null(savedRecord.Detail);
+            Assert.Null(savedRecord.EndTime);
         }
     }
 }

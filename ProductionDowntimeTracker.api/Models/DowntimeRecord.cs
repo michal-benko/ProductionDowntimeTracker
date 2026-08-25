@@ -11,10 +11,13 @@
         //null znamená, že prostoj stále probíhá
         public DateTime? EndTime { get; set; }
 
-        
-        public string Reason { get; set; } = string.Empty;
-
         public Machine Machine { get; set; } = null!;
+
+        public int? CategoryId { get; set; }
+
+        public DowntimeCategory? Category { get; set; }
+
+        public string? Detail {get; set; }
 
     }
 }

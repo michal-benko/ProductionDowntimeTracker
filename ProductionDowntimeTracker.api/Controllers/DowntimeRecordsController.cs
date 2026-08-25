@@ -50,7 +50,6 @@ namespace ProductionDowntimeTracker.api.Controllers
                 MachineId = request.MachineId,
                 StartTime = DateTime.UtcNow,
                 EndTime = null,
-                Reason = request.Reason.Trim()
             };
 
             _context.DowntimeRecords.Add(downtimeRecord);
@@ -60,7 +59,9 @@ namespace ProductionDowntimeTracker.api.Controllers
         }
 
         [HttpPut("{id}/stop")]
-        public async Task<IActionResult> StopDowntime(int id)
+        public async Task<IActionResult> StopDowntime(
+            int id,
+            [FromBody] StopDowntimeRequest request)
         {
             // Vyhledání prostoje podle jeho ID
             var downtimeRecord =
@@ -79,6 +80,24 @@ namespace ProductionDowntimeTracker.api.Controllers
                     $"Prostoj s ID {id} už byl ukončen.");
             }
 
+            // Kontrola existence kategorie
+            bool categoryExists = await _context.DowntimeCategories
+                .AnyAsync(category => category.Id == request.CategoryId);
+
+            if (!categoryExists)
+            {
+                return NotFound($"Kategorie s ID {request.CategoryId} neexistuje.");
+            }
+
+            string trimmedDetail = request.Detail.Trim();
+
+            if (trimmedDetail.Length < 5)
+            {
+                return BadRequest("Detail musí obsahovat alespoň 5 znaků.");
+            }
+
+            downtimeRecord.CategoryId = request.CategoryId;
+            downtimeRecord.Detail = trimmedDetail;
             downtimeRecord.EndTime = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
