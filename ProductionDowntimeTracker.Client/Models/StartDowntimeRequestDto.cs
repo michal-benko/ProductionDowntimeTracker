@@ -6,8 +6,5 @@ namespace ProductionDowntimeTracker.Client.Models
     {
         [Range(1, int.MaxValue, ErrorMessage = "Vyberte stroj.")]
         public int MachineId { get; set; }
-
-        [Required(ErrorMessage = "Důvod prostoje je povinný.")]
-        public string Reason { get; set; } = string.Empty;
     }
 }

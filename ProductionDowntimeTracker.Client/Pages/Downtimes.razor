@@ -32,17 +32,6 @@
                            class="text-danger" />
     </div>
 
-    <div class="mb-3">
-        <label for="reason" class="form-label">Důvod prostoje</label>
-
-        <InputText id="reason"
-                   class="form-control"
-                   @bind-Value="newDowntime.Reason" />
-
-        <ValidationMessage For="@(() => newDowntime.Reason)"
-                           class="text-danger" />
-    </div>
-
     <button type="submit" class="btn btn-primary">
         Zahájit prostoj
     </button>
@@ -71,7 +60,8 @@ else
             <tr>
                 <th>ID</th>
                 <th>Stroj</th>
-                <th>Důvod</th>
+                <th>Kategorie</th>
+                <th>Detail</th>
                 <th>Začátek</th>
                 <th>Konec</th>
                 <th>Délka</th>
@@ -86,7 +76,13 @@ else
                 <tr>
                     <td>@record.Id</td>
                     <td>@GetMachineName(record.MachineId)</td>
-                    <td>@record.Reason</td>
+                    <td>@GetCategoryName(record.CategoryId)</td>
+
+                    <td>
+                        @(string.IsNullOrWhiteSpace(record.Detail)
+                            ? "—"
+                            : record.Detail)
+                    </td>
                     <td>@record.StartTime.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</td>
                     <td>
                         @(record.EndTime.HasValue
@@ -102,7 +98,7 @@ else
                         {
                             <button type="button"
                                     class="btn btn-success btn-sm"
-                                    @onclick="() => StopDowntimeAsync(record.Id)">
+                                    @onclick="() => OpenStopDialog(record.Id)">
                                 Ukončit prostoj
                             </button>
                         }
@@ -115,13 +111,127 @@ else
             }
         </tbody>
     </table>
+
+@if (downtimeIdToStop.HasValue)
+{
+    <div class="modal fade show d-block"
+         tabindex="-1"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="stopDowntimeTitle">
+
+        <div class="modal-dialog modal-dialog-centered"
+             role="document">
+
+            <EditForm Model="@stopDowntime"
+                      OnValidSubmit="@ConfirmStopDowntimeAsync"
+                      class="modal-content">
+
+                <DataAnnotationsValidator />
+
+                <div class="modal-header">
+                    <h5 class="modal-title"
+                        id="stopDowntimeTitle">
+                        Ukončit prostoj
+                    </h5>
+
+                    <button type="button"
+                            class="btn-close"
+                            aria-label="Zavřít"
+                            disabled="@isStopping"
+                            @onclick="CloseStopDialog">
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    @if (stopErrorMessage is not null)
+                    {
+                        <div class="alert alert-danger">
+                            @stopErrorMessage
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label for="stopCategory"
+                               class="form-label">
+                            Kategorie
+                        </label>
+
+                        <InputSelect id="stopCategory"
+                                     class="form-select"
+                                     @bind-Value="stopDowntime.CategoryId">
+
+                            <option value="0">
+                                -- Vyberte kategorii --
+                            </option>
+
+                            @if (categories is not null)
+                            {
+                                @foreach (DowntimeCategoryDto category in categories)
+                                {
+                                    <option value="@category.Id">
+                                        @category.Name
+                                    </option>
+                                }
+                            }
+                        </InputSelect>
+
+                        <ValidationMessage For="@(() => stopDowntime.CategoryId)"
+                                           class="text-danger" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="stopDetail"
+                               class="form-label">
+                            Detail prostoje
+                        </label>
+
+                        <InputTextArea id="stopDetail"
+                                       class="form-control"
+                                       rows="4"
+                                       maxlength="500"
+                                       @bind-Value="stopDowntime.Detail" />
+
+                        <ValidationMessage For="@(() => stopDowntime.Detail)"
+                                           class="text-danger" />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            disabled="@isStopping"
+                            @onclick="CloseStopDialog">
+                        Zrušit
+                    </button>
+
+                    <button type="submit"
+                            class="btn btn-success"
+                            disabled="@isStopping">
+                        @(isStopping
+                            ? "Ukončuji..."
+                            : "Ukončit prostoj")
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+
+    <div class="modal-backdrop fade show"></div>
+}
+
 }
 
 @code {
     private List<DowntimeRecordDto>? downtimeRecords;
     private string? errorMessage;
     private List<MachineDto>? machines;
+    private List<DowntimeCategoryDto>? categories;
     private StartDowntimeRequestDto newDowntime = new();
+    private StopDowntimeRequestDto stopDowntime = new();
+    private int? downtimeIdToStop;
+    private string? stopErrorMessage;
+    private bool isStopping;
 
     protected override async Task OnInitializedAsync()
     {
@@ -134,6 +244,10 @@ else
             machines =
                 await Http.GetFromJsonAsync<List<MachineDto>>(
                     "api/Machines");
+
+            categories =
+                await Http.GetFromJsonAsync<List<DowntimeCategoryDto>>(
+                    "api/DowntimeCategories");
         }
         catch (Exception ex)
         {
@@ -148,6 +262,35 @@ else
             machines?.FirstOrDefault(machine => machine.Id == machineId);
 
         return machine?.Name ?? $"Neznámý stroj (ID {machineId})";
+    }
+
+    private string GetCategoryName(int? categoryId)
+    {
+        if (!categoryId.HasValue)
+        {
+            return "—";
+        }
+
+        DowntimeCategoryDto? category =
+            categories?.FirstOrDefault(
+                item => item.Id == categoryId.Value);
+
+        return category?.Name
+            ?? $"Neznámá kategorie (ID {categoryId.Value})";
+    }
+
+    private void OpenStopDialog(int id)
+    {
+        downtimeIdToStop = id;
+        stopDowntime = new StopDowntimeRequestDto();
+        stopErrorMessage = null;
+    }
+
+    private void CloseStopDialog()
+    {
+        downtimeIdToStop = null;
+        stopDowntime = new StopDowntimeRequestDto();
+        stopErrorMessage = null;
     }
 
     private async Task StartDowntimeAsync()
@@ -176,29 +319,53 @@ else
         }
     }
 
-    private async Task StopDowntimeAsync(int id)
+    private async Task ConfirmStopDowntimeAsync()
     {
+        if (!downtimeIdToStop.HasValue)
+        {
+            return;
+        }
+
         try
         {
-            errorMessage = null;
+            isStopping = true;
+            stopErrorMessage = null;
 
             HttpResponseMessage response =
-                await Http.PutAsync(
-                    $"api/DowntimeRecords/{id}/stop",
-                    null);
+                await Http.PutAsJsonAsync(
+                    $"api/DowntimeRecords/{downtimeIdToStop.Value}/stop",
+                    stopDowntime);
 
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                string responseMessage =
+                    await response.Content.ReadAsStringAsync();
+
+                stopErrorMessage =
+                    string.IsNullOrWhiteSpace(responseMessage)
+                        ? $"API vrátilo chybu {(int)response.StatusCode}."
+                        : responseMessage;
+
+                return;
+            }
 
             downtimeRecords =
                 await Http.GetFromJsonAsync<List<DowntimeRecordDto>>(
                     "api/DowntimeRecords");
+
+            CloseStopDialog();
         }
         catch (Exception ex)
         {
-            errorMessage =
+            stopErrorMessage =
                 $"Prostoj se nepodařilo ukončit: {ex.Message}";
         }
+        finally
+        {
+            isStopping = false;
+        }
     }
+
 
     private string GetDuration(DowntimeRecordDto record)
     {
