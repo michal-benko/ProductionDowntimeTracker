@@ -4,6 +4,7 @@ using ProductionDowntimeTracker.api.Controllers;
 using ProductionDowntimeTracker.api.Data;
 using ProductionDowntimeTracker.api.DTOs;
 using ProductionDowntimeTracker.api.Models;
+using ProductionDowntimeTracker.api.Services;
 using Xunit;
 
 namespace ProductionDowntimeTracker.Tests
@@ -20,12 +21,20 @@ namespace ProductionDowntimeTracker.Tests
             return new MachineDbContext(options);
         }
 
+        private static DowntimeRecordsController CreateController(
+            MachineDbContext context)
+        {
+            return new DowntimeRecordsController(
+                context,
+                new CsvExportService());
+        }
+
         [Fact]
         public async Task StartDowntime_MachineDoesNotExist_ReturnsNotFound()
         {
             // Arrange – databáze neobsahuje stroj s ID 999.
             await using var context = CreateContext();
-            var controller = new DowntimeRecordsController(context);
+            var controller = CreateController(context);
 
             var request = new StartDowntimeRequest
             {
@@ -70,7 +79,7 @@ namespace ProductionDowntimeTracker.Tests
 
             await context.SaveChangesAsync();
 
-            var controller = new DowntimeRecordsController(context);
+            var controller = CreateController(context);
 
             var request = new StartDowntimeRequest
             {
@@ -125,7 +134,7 @@ namespace ProductionDowntimeTracker.Tests
 
             await context.SaveChangesAsync();
 
-            var controller = new DowntimeRecordsController(context);
+            var controller = CreateController(context);
 
             var request = new StopDowntimeRequest
             {
@@ -184,7 +193,7 @@ namespace ProductionDowntimeTracker.Tests
 
             await context.SaveChangesAsync();
 
-            var controller = new DowntimeRecordsController(context);
+            var controller = CreateController(context);
 
             var request = new StopDowntimeRequest
             {
@@ -241,7 +250,7 @@ namespace ProductionDowntimeTracker.Tests
 
             await context.SaveChangesAsync();
 
-            var controller = new DowntimeRecordsController(context);
+            var controller = CreateController(context);
 
             var request = new StopDowntimeRequest
             {

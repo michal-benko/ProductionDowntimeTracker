@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ProductionDowntimeTracker.api.Data;
 using ProductionDowntimeTracker.api.DTOs;
 using ProductionDowntimeTracker.api.Models;
+using ProductionDowntimeTracker.api.Services;
 using System.Reflection.PortableExecutable;
 
 
@@ -13,10 +14,12 @@ namespace ProductionDowntimeTracker.api.Controllers
     public class DowntimeRecordsController : ControllerBase
     {
         private readonly MachineDbContext _context;
+        private readonly CsvExportService _csvExportService;
 
-        public DowntimeRecordsController(MachineDbContext context)
+        public DowntimeRecordsController(MachineDbContext context, CsvExportService csvExportService)
         {
             _context = context;
+            _csvExportService = csvExportService;
         }
 
         [HttpPost("start")]
@@ -103,6 +106,35 @@ namespace ProductionDowntimeTracker.api.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(downtimeRecord);
+        }
+        
+        [HttpGet("export")]
+        public async Task<IActionResult> ExportDowntimeRecords()
+        {
+            // Jde pouze o čtení, proto EF Core nemusí záznamy sledovat.
+            var downtimeRecords = await _context.DowntimeRecords
+                .AsNoTracking()
+
+                // CSV potřebuje také název stroje a kategorie.
+                .Include(record => record.Machine)
+                .Include(record => record.Category)
+
+                .OrderBy(record => record.StartTime)
+                .ToListAsync();
+
+            // Služba převede načtené prostoje na obsah CSV.
+            byte[] csvBytes =
+                _csvExportService.GenerateDowntimeCsv(downtimeRecords);
+
+            // Každý export dostane název obsahující aktuální datum a čas.
+            string fileName =
+                $"prostoje-{DateTime.UtcNow:yyyy-MM-dd-HHmmss}.csv";
+
+            // File() vytvoří HTTP odpověď obsahující soubor.
+            return File(
+                csvBytes,
+                "text/csv; charset=utf-8",
+                fileName);
         }
 
         [HttpGet]

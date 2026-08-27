@@ -35,6 +35,11 @@
     <button type="submit" class="btn btn-primary">
         Zahájit prostoj
     </button>
+
+    <a class="btn btn-success float-end"
+       href="@ExportUrl">
+        Exportovat data (.csv)
+    </a>
 </EditForm>
 
 <hr />
@@ -232,6 +237,11 @@ else
     private int? downtimeIdToStop;
     private string? stopErrorMessage;
     private bool isStopping;
+    private string ExportUrl =>
+        new Uri(
+            Http.BaseAddress!,
+            "api/DowntimeRecords/export")
+        .ToString();
 
     protected override async Task OnInitializedAsync()
     {
