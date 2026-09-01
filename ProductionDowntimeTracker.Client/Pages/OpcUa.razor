@@ -1,0 +1,116 @@
+﻿@page "/opcua"
+@using System.Net.Http.Json
+@using ProductionDowntimeTracker.Client.Models
+@inject HttpClient Http
+
+<PageTitle>OPC UA</PageTitle>
+
+<h1>OPC UA monitoring</h1>
+
+<p>Aktuální hodnoty načtené ze simulovaného OPC UA serveru.</p>
+
+<button type="button"
+        class="btn btn-primary mb-3"
+        disabled="@isLoading"
+        @onclick="LoadStatusAsync">
+    @(isLoading ? "Načítám..." : "Obnovit stav")
+</button>
+
+@if (isLoading && status is null)
+{
+    <p>Navazuji spojení s OPC UA serverem...</p>
+}
+else if (errorMessage is not null)
+{
+    <div class="alert alert-danger">
+        <strong>Server není dostupný.</strong>
+        <div>@errorMessage</div>
+    </div>
+}
+else if (status is not null)
+{
+    <div class="alert alert-success">
+        OPC UA server je připojený.
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Stav stroje</h5>
+
+                    <p class="card-text fs-4">
+                        @(status.MachineRunning
+                            ? "V provozu"
+                            : "Zastaven")
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Porucha</h5>
+
+                    <p class="card-text fs-4">
+                        @(status.FaultActive
+                            ? "Porucha aktivní"
+                            : "Bez poruchy")
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Počet cyklů stroje</h5>
+
+                    <p class="card-text fs-4">
+                        @status.ProducedCycles
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private OpcUaStatusDto? status;
+    private string? errorMessage;
+    private bool isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatusAsync();
+    }
+
+    private async Task LoadStatusAsync()
+    {
+        try
+        {
+            isLoading = true;
+            errorMessage = null;
+
+            status = await Http.GetFromJsonAsync<OpcUaStatusDto>(
+                "api/OpcUa/status");
+
+            if (status is null)
+            {
+                errorMessage =
+                    "API nevrátilo žádná data.";
+            }
+        }
+        catch (Exception)
+        {
+            status = null;
+            errorMessage =
+                "Nepodařilo se načíst data z OPC UA serveru";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+}

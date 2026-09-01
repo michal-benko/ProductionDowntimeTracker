@@ -1,12 +1,22 @@
 using ProductionDowntimeTracker.api.Data;
 using ProductionDowntimeTracker.api.Services;
+using ProductionDowntimeTracker.api.Options;
 using Microsoft.EntityFrameworkCore;
+using Opc.Ua;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
+
+builder.Services.Configure<OpcUaOptions>(
+    builder.Configuration.GetSection(OpcUaOptions.SectionName));
+
+builder.Services.AddSingleton<ITelemetryContext>(
+    _ => DefaultTelemetry.Create(logging => logging.AddConsole()));
+
+builder.Services.AddSingleton<IOpcUaService, OpcUaService>();
 
 builder.Services.AddDbContext<MachineDbContext>(options =>
     options.UseSqlServer(
