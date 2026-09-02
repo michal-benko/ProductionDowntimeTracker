@@ -1,0 +1,194 @@
+﻿@using ProductionDowntimeTracker.Client.Models.AiAssistant
+@using ProductionDowntimeTracker.Client.Services
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject AiAssistantChatService ChatService
+
+<div class="ai-chat-widget">
+    @if (!_isOpen)
+    {
+        <button type="button"
+                class="chat-launcher"
+                @onclick="OpenChat"
+                aria-label="Otevřít AI asistenta">
+
+            <svg class="robot-icon"
+                 viewBox="0 0 24 24"
+                 fill="none"
+                 stroke="currentColor"
+                 stroke-width="2"
+                 aria-hidden="true">
+                <rect x="4" y="7" width="16" height="12" rx="3" />
+                <path d="M12 7V4M10 4h4M4 12H2M22 12h-2M8 19v2M16 19v2" />
+                <circle cx="9" cy="13" r="1" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="13" r="1" fill="currentColor" stroke="none" />
+                <path d="M9 16h6" />
+            </svg>
+
+            <span>AI asistent</span>
+        </button>
+    }
+    else
+    {
+        <section class="chat-panel">
+            <header class="chat-header">
+                <div class="chat-title">
+                    <svg class="robot-icon"
+                         viewBox="0 0 24 24"
+                         fill="none"
+                         stroke="currentColor"
+                         stroke-width="2"
+                         aria-hidden="true">
+                        <rect x="4" y="7" width="16" height="12" rx="3" />
+                        <path d="M12 7V4M10 4h4M4 12H2M22 12h-2M8 19v2M16 19v2" />
+                        <circle cx="9" cy="13" r="1" fill="currentColor" stroke="none" />
+                        <circle cx="15" cy="13" r="1" fill="currentColor" stroke="none" />
+                        <path d="M9 16h6" />
+                    </svg>
+
+                    <span>AI asistent</span>
+                </div>
+
+                <button type="button"
+                        class="chat-close"
+                        @onclick="CloseChat"
+                        aria-label="Minimalizovat chat">
+                    ×
+                </button>
+            </header>
+
+            <div class="chat-messages" @ref="_messagesContainer">
+                <div class="chat-message assistant-message">
+                    @AiAssistantChatService.WelcomeMessage
+                </div>
+
+                @foreach (AiChatMessageDto message in ChatService.Messages)
+                {
+                    <div class="@GetMessageCssClass(message.Role)">
+                        @message.Content
+                    </div>
+                }
+
+                @if (ChatService.IsLoading)
+                {
+                    <div class="chat-message assistant-message loading-message">
+                        AI asistent píše…
+                    </div>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(ChatService.ErrorMessage))
+            {
+                <div class="chat-error" role="alert">
+                    @ChatService.ErrorMessage
+                </div>
+            }
+
+            <form class="chat-input-area"
+                  @onsubmit="SendAsync"
+                  @onsubmit:preventDefault>
+
+                <textarea @ref="_messageInput"
+                          readonly="@ChatService.IsLoading"
+                          rows="2"
+                          maxlength="@AiAssistantChatService.MaxUserMessageLength"
+                          placeholder="Napište zprávu…"
+                          aria-label="Zpráva pro AI asistenta"
+                          onkeydown="if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); this.form.requestSubmit(); }"
+                          @bind="_inputMessage"
+                          @bind:event="oninput"></textarea>
+
+
+                <button type="submit"
+                        class="send-button"
+                        disabled="@(ChatService.IsLoading ||
+                                       string.IsNullOrWhiteSpace(_inputMessage))"
+                        aria-label="Odeslat zprávu"
+                        title="Odeslat zprávu">
+
+                    <svg class="send-icon"
+                         viewBox="0 0 24 24"
+                         aria-hidden="true">
+                        <path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" />
+                    </svg>
+                </button>
+            </form>
+        </section>
+    }
+</div>
+
+@code {
+    private bool _isOpen;
+    private string _inputMessage = string.Empty;
+    private ElementReference _messagesContainer;
+    private ElementReference _messageInput;
+    private bool _scrollAfterRender;
+    private bool _focusAfterRender;
+
+    private void OpenChat()
+    {
+        _isOpen = true;
+        _scrollAfterRender = true;
+        _focusAfterRender = true;
+    }
+
+    private void CloseChat()
+    {
+        _isOpen = false;
+    }
+
+    private async Task SendAsync()
+    {
+        if (ChatService.IsLoading ||
+            string.IsNullOrWhiteSpace(_inputMessage))
+        {
+            return;
+        }
+
+        string message = _inputMessage;
+        _inputMessage = string.Empty;
+
+        Task sendTask = ChatService.SendMessageAsync(message);
+
+        _scrollAfterRender = true;
+        await InvokeAsync(StateHasChanged);
+
+        await sendTask;
+
+        _scrollAfterRender = true;
+        _focusAfterRender = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private static string GetMessageCssClass(string role)
+    {
+        return string.Equals(
+            role,
+            "user",
+            StringComparison.OrdinalIgnoreCase)
+            ? "chat-message user-message"
+            : "chat-message assistant-message";
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_isOpen)
+        {
+            return;
+        }
+
+        if (_scrollAfterRender)
+        {
+            _scrollAfterRender = false;
+
+            await JS.InvokeVoidAsync(
+                "aiAssistantChat.scrollToBottom",
+                _messagesContainer);
+        }
+
+        if (_focusAfterRender && !ChatService.IsLoading)
+        {
+            _focusAfterRender = false;
+            await _messageInput.FocusAsync();
+        }
+    }
+}

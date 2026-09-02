@@ -13,6 +13,11 @@ builder.Services.AddControllers();
 builder.Services.Configure<OpcUaOptions>(
     builder.Configuration.GetSection(OpcUaOptions.SectionName));
 
+builder.Services.Configure<AiAssistantOptions>(
+    builder.Configuration.GetSection(AiAssistantOptions.SectionName));
+
+builder.Services.AddSingleton<IAiAssistantService, GeminiAiAssistantService>();
+
 builder.Services.AddSingleton<ITelemetryContext>(
     _ => DefaultTelemetry.Create(logging => logging.AddConsole()));
 
