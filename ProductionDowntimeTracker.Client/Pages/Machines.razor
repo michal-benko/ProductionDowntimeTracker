@@ -9,8 +9,6 @@
 
 <h2>Přidat nový stroj</h2>
 
-<th>Akce</th>
-
 <EditForm Model="@newMachine" OnValidSubmit="@CreateMachineAsync">
     <DataAnnotationsValidator />
     <div class="mb-3">
@@ -60,6 +58,7 @@ else
                 <th>ID</th>
                 <th>Název</th>
                 <th>Stav</th>
+                <th>Akce</th>
             </tr>
         </thead>
         <tbody>

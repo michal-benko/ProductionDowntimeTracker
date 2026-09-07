@@ -8,7 +8,6 @@
 
         public DateTime StartTime { get; set; }
 
-        //null znamená, že prostoj stále probíhá
         public DateTime? EndTime { get; set; }
 
         public Machine Machine { get; set; } = null!;

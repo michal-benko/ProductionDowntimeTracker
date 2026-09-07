@@ -1,6 +1,6 @@
 @ProductionDowntimeTracker.api_HostAddress = http://localhost:5183
 
-GET {{ProductionDowntimeTracker.api_HostAddress}}/weatherforecast/
+GET {{ProductionDowntimeTracker.api_HostAddress}}/api/Machines
 Accept: application/json
 
 ###
